@@ -1,4 +1,40 @@
-﻿## Quick Env ##
+﻿## Quick Glance ##
+```
+1. The "stride" is totally decided by the model struct, as the output receptive field of the model. E.g.,
+with the official yolov3 struct, the strides, also known as the output receptive fields are: 8, 16 and 32.
+It has nothing to do with input image or anchor box size, it's an nature/essential property of the model.
+----------------------------------------------------------------------------------------------------------
+Thus, one can input images with different kinds of resolutions into the model, and get the output objects.
+Pay attention here, the min input size should be large than the max stride, e.g. 32 pixel for official yolo.
+The only difference is there would be fewer large/middle objects, and the large objects in the origin big
+images would be detected as middle or small objects. For example, with official yolov3 model,
+==========================================================================================================
+ resolutions | feature map shape(stride: 8, 16, 32) | comments
+----------------------------------------------------------------------------------------------------------
+  640x640x3  |  3x85x80x80, 3x85x40x40, 3x85x20x20  | 1) take time;
+  320x320x3  |  3x85x40x40, 3x85x20x20, 3x85x10x10  | 1) much faster since feature map shape is 1/4;
+==========================================================================================================
+So the feature map shape is actually the grid cell's count, e.g. 3x85x80x80 => total 80x80 grid cells.
+If we need to handle rather small images, then we'd better update the model struct, e.g. add new layer/block
+struct for extracting feature maps of stride: 4.
+
+2. The "anchor box" is totally decided by the input image datasets. It has nothing to do with the model struct
+except the model performance. It's an nature/essential property of the dataset. Once a model is under training,
+the related "anchor box" is fixed. For yolov3, each feature point has 3 different shapes of anchor box(based on
+image size 640x640 with COCO dataset).
+
+3. For yolov3(pytorch), the predicted offsets for bbox are scaled by 1/2, and shifted by +0.5 .
+(0,0) +-------+ (0, 1)                   (dx, dy)
+      | _____ |                 predicted       origin
+      | |   | |                 (0.50, 0.50) -> (0.50, 0.50)
+      | | . | | <- (0.5, 0.5)   (0.25, 0.25) -> (0.00, 0.00)
+      | |   | |                 (0.75, 0.75) -> (1.00, 1.00)
+      | ¯¯¯¯¯ |                 (0.00, 0.00) -> (-0.5, -0.5)
+(1,0) +-------+ (1, 1)          (1.00, 1.00) -> (1.50, 1.50)
+It seems that the predicted center point can be outside the grid cell.
+```
+
+## Quick Env ##
 ```
 ## create new env(e.g. ubuntu>=16.04)
 $ conda create -n yolov3 python=3.8 -y
@@ -199,4 +235,38 @@ epoch  mem  lossbox  lossobj losscls losstotal  targets img_size    P      R   m
 ========================================================================================================================
 0/29 10.9G  0.03062 0.008517       0   0.03914       79      640 0.8286 0.7928 0.8634   0.6108   0.02334 0.004774   0
 ...
+
+4. How to debug model?
+>>> ## load pytorch state dict
+>>> import torch
+>>> device = "cpu"
+>>> ckpt = torch.load("weights/yolov3.pt", map_location=device)
+>>> ckpt.keys()
+dict_keys(['epoch', 'best_fitness', 'training_results', 'model', 'ema', 'updates', 'optimizer', 'wandb_id'])
+>>> ## load models.yolo.Model(without model state dict)
+>>> from models.yolo import Model
+>>> model = Model(opt.cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)
+>>> ## load model state dict
+>>> exclude = ['anchor'] if (opt.cfg or hyp.get('anchors')) and not opt.resume else []  # exclude keys
+>>> state_dict = ckpt['model'].float().state_dict()  # to FP32
+>>> state_dict = intersect_dicts(state_dict, model.state_dict(), exclude=exclude)  # intersect
+>>> model.load_state_dict(state_dict, strict=False)  # load
+
+5. How to check module?
+>>> ## load models.yolo.Model(without model state dict)
+>>> m = model.module.model[-1] if hasattr(model, 'module') else model.model[-1]
+>>> m
+Detect(
+  (m): ModuleList(
+    (0): Conv2d(128, 18, kernel_size=(1, 1), stride=(1, 1))
+    (1): Conv2d(256, 18, kernel_size=(1, 1), stride=(1, 1))
+  )
+)
+>>> m.anchor_grid[:]
+tensor([[[[[[  8.33594,  16.42188]]],
+          [[[ 17.78125,  35.81250]]],
+          [[[ 34.93750,  64.00000]]]]],
+        [[[[[ 60.81250, 124.00000]]],
+          [[[112.43750, 230.25000]]],
+          [[[257.50000, 348.75000]]]]]])
 ```

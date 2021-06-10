@@ -25,7 +25,7 @@ verbose=True, save_txt=True, save_hybrid=False, save_conf=True, save_json=False,
 ===========================================================================================================================================
     model   | GPU Memory | Layers | Parameters | Gradients |  FLOPS  | Precision    Recall  mAP@0.5 mAP@0.5:0.95
 ===========================================================================================================================================
-yolov3-tiny | 3965MiB    |  48    | 8,849,182  |    0      |  13.2G  |     0.624    0.543    0.561      0.261
+yolov3-tiny | 3965MiB    |  48    |  8,849,182 |    0      |  13.2G  |     0.624    0.543    0.561      0.261
 -------------------------------------------------------------------------------------------------------------------------------------------
 yolov3-spp  | 12499MiB   |  269   | 62,971,933 |    0      | 157.1G  |     0.8      0.734    0.799      0.529
 -------------------------------------------------------------------------------------------------------------------------------------------
@@ -51,13 +51,13 @@ $ OPTIONS="--data data/coco_person.yaml --single-cls --epochs 300 --batch-size 2
 $ python train.py --weights '' --cfg models/$MODEL.yaml --project runs/train/$MODEL $OPTIONS
 ```
 
-## Test Case 1: scratch/finetune with official weights (X: optimize too slow) ##
+## Test Case 1: scratch/finetune with official weights (Y: optimize too slow) ##
 ```
 $ MODEL=yolov3-tiny
 ===========================================================================================================================================
 yolov3-tiny | --device |    --weights           |       --cfg             |         --hyp           | Precision Recall mAP@0.5 mAP@0.5:0.95
 ===========================================================================================================================================
-(↑) case1   |   CPU    | weights/yolov3-tiny.pt | models/yolov3-tiny.yaml | data/hyp.scratch.yaml   |   0.6656  0.5055  0.5637  0.2645  <-- ^C (↑  5/299)
+(↑) case1   |   CPU    | weights/yolov3-tiny.pt | models/yolov3-tiny.yaml | data/hyp.scratch.yaml   |   0.6503  0.5429  0.5836  0.2873  <-- ^C (↑ 57/299)
 -------------------------------------------------------------------------------------------------------------------------------------------
 (↑) case2   |  CUDA:0  | weights/yolov3-tiny.pt | models/yolov3-tiny.yaml | data/hyp.finetune.yaml  |   0.6428  0.5311  0.5671  0.2683  <-- ^C (↑ 10/299)
 ===========================================================================================================================================
@@ -86,7 +86,7 @@ single_cls: true
 adam: false
 ```
 
-## Test Case 2: scratch with warmup weights on val data (Y: seems overfit a lot) ##
+## Test Case 2: scratch with warmup weights on val data (X: seems overfit a lot) ##
 ```
 $ MODEL=yolov3-tiny
 ===========================================================================================================================================
@@ -160,6 +160,7 @@ TODO
 
 ## Test Results ##
 ```
-1) scratch on val data => scratch on train data; ???
-2) finetune with pretrained weights directly;
+1) Don't train model on val data as warmup, see the following ticket for more details:
+https://github.com/ultralytics/yolov3/issues/1648#issuecomment-756552051
+2) finetune with pretrained weights directly is enought;
 ```
